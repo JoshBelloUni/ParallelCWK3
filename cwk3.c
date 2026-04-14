@@ -63,9 +63,42 @@ int main( int argc, char **argv )
     // Transpose the matrix on the GPU.
     //
 
+    // Compile the transpose kernel.
+    cl_kernel kernel = compileKernelFromFile( "cwk3.cl", "transpose", context, device );
 
-    // ...
+    // Allocate device buffers for input and output.
+    cl_mem d_input  = clCreateBuffer( context, CL_MEM_READ_ONLY,  nRows*nCols*sizeof(float), NULL, &status );
+    cl_mem d_output = clCreateBuffer( context, CL_MEM_WRITE_ONLY, nRows*nCols*sizeof(float), NULL, &status );
 
+    // Copy the host matrix to the device input buffer.
+    clEnqueueWriteBuffer( queue, d_input, CL_TRUE, 0, nRows*nCols*sizeof(float), hostMatrix, 0, NULL, NULL );
+
+    // Set kernel arguments: input, output, nRows, nCols.
+    clSetKernelArg( kernel, 0, sizeof(cl_mem), &d_input  );
+    clSetKernelArg( kernel, 1, sizeof(cl_mem), &d_output );
+    clSetKernelArg( kernel, 2, sizeof(int),    &nRows    );
+    clSetKernelArg( kernel, 3, sizeof(int),    &nCols    );
+
+    // Global work size: round up nCols and nRows to the nearest multiple of TILE_SIZE.
+    // Since both are powers of 2, this is only needed when they are smaller than TILE_SIZE.
+    #define TILE_SIZE 16
+    size_t globalSize[2] = {
+        ((nCols + TILE_SIZE - 1) / TILE_SIZE) * TILE_SIZE,
+        ((nRows + TILE_SIZE - 1) / TILE_SIZE) * TILE_SIZE
+    };
+    size_t localSize[2] = { TILE_SIZE, TILE_SIZE };
+
+    // Enqueue the kernel and wait for it to finish.
+    clEnqueueNDRangeKernel( queue, kernel, 2, NULL, globalSize, localSize, 0, NULL, NULL );
+    clFinish( queue );
+
+    // Copy the transposed result back to the host matrix array.
+    clEnqueueReadBuffer( queue, d_output, CL_TRUE, 0, nRows*nCols*sizeof(float), hostMatrix, 0, NULL, NULL );
+
+    // Release device resources.
+    clReleaseMemObject( d_input  );
+    clReleaseMemObject( d_output );
+    clReleaseKernel   ( kernel   );
 
     //
     // Display the final result. This assumes that the transposed matrix was copied back to the hostMatrix array
