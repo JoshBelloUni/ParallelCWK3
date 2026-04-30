@@ -46,6 +46,12 @@ int main( int argc, char **argv )
     cl_device_id device;
     cl_context context = simpleOpenContext_GPU(&device);
 
+    // Query the device for the maximum work-group size and derive a square tile size.
+    size_t maxWorkItems;
+    clGetDeviceInfo( device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), &maxWorkItems, NULL );
+    size_t tileSize = 1;
+    while( (tileSize*2) * (tileSize*2) <= maxWorkItems ) tileSize *= 2;
+
     // Open up a single command queue, with the profiling option off (third argument = 0).
     cl_int status;
     cl_command_queue queue = clCreateCommandQueue( context, device, 0, &status );
@@ -78,15 +84,14 @@ int main( int argc, char **argv )
     clSetKernelArg( kernel, 1, sizeof(cl_mem), &d_output );
     clSetKernelArg( kernel, 2, sizeof(int),    &nRows    );
     clSetKernelArg( kernel, 3, sizeof(int),    &nCols    );
+    clSetKernelArg( kernel, 4, tileSize * tileSize * sizeof(float), NULL );
 
-    // Global work size: round up nCols and nRows to the nearest multiple of TILE_SIZE.
-    // Since both are powers of 2, this is only needed when they are smaller than TILE_SIZE.
-    #define TILE_SIZE 16
+    // Global work size: round up nCols and nRows to the nearest multiple of tileSize.
     size_t globalSize[2] = {
-        ((nCols + TILE_SIZE - 1) / TILE_SIZE) * TILE_SIZE,
-        ((nRows + TILE_SIZE - 1) / TILE_SIZE) * TILE_SIZE
+        ((nCols + tileSize - 1) / tileSize) * tileSize,
+        ((nRows + tileSize - 1) / tileSize) * tileSize
     };
-    size_t localSize[2] = { TILE_SIZE, TILE_SIZE };
+    size_t localSize[2] = { tileSize, tileSize };
 
     // Enqueue the kernel and wait for it to finish.
     clEnqueueNDRangeKernel( queue, kernel, 2, NULL, globalSize, localSize, 0, NULL, NULL );
