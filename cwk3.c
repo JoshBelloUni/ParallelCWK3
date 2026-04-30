@@ -64,6 +64,7 @@ int main( int argc, char **argv )
     printf( "Original matrix (only top-left shown if too large):\n" );
     displayMatrix( hostMatrix, nRows, nCols );
 
+    printf("Max Work-Group Size: %i, Local size: %i \n", maxWorkItems, tileSize);
 
     //
     // Transpose the matrix on the GPU.
@@ -93,7 +94,12 @@ int main( int argc, char **argv )
     size_t localSize[2] = { tileSize, tileSize };
 
     // Enqueue the kernel and wait for it to finish.
-    clEnqueueNDRangeKernel( queue, kernel, 2, NULL, globalSize, localSize, 0, NULL, NULL );
+    status = clEnqueueNDRangeKernel( queue, kernel, 2, NULL, globalSize, localSize, 0, NULL, NULL );
+    if( status != CL_SUCCESS ) {
+		printf( "Could not create device array: Error %d.\n", status );
+		return EXIT_FAILURE;
+	}
+
     clFinish( queue );
 
     // Copy the transposed result back to the host matrix array.
