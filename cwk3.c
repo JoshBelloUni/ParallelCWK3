@@ -84,7 +84,6 @@ int main( int argc, char **argv )
     clSetKernelArg( kernel, 1, sizeof(cl_mem), &d_output );
     clSetKernelArg( kernel, 2, sizeof(int),    &nRows    );
     clSetKernelArg( kernel, 3, sizeof(int),    &nCols    );
-    clSetKernelArg( kernel, 4, tileSize * tileSize * sizeof(float), NULL );
 
     // Global work size: round up nCols and nRows to the nearest multiple of tileSize.
     size_t globalSize[2] = {
